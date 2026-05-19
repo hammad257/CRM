@@ -11,6 +11,7 @@ import { AddCustomerHistoryDto } from './dto/add-customer-history.dto';
 import { ListCustomersQueryDto } from './dto/list-customers.query';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { WebsiteInquiryDto } from './dto/website-inquiry.dto';
+import { LeadAssignmentService } from './lead-assignment.service';
 
 const EXPORT_MAX = 5000;
 
@@ -48,7 +49,10 @@ const leadSummarySelect = {
 
 @Injectable()
 export class CustomersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly leadAssignment: LeadAssignmentService,
+  ) {}
 
   /**
    * Public: website form creates/updates customer + stores a Lead (WEBSITE).
@@ -110,6 +114,9 @@ export class CustomersService {
         dto.subject?.trim() ||
         `Website inquiry — ${dto.companyName?.trim() || email}`;
 
+      const assignee =
+        await this.leadAssignment.pickNextOwnerForInbound(tx);
+
       const lead = await tx.lead.create({
         data: {
           title: subject,
@@ -123,11 +130,22 @@ export class CustomersService {
           status: 'NEW',
           description: dto.message.trim(),
           customerId: customer.id,
-          ownerId: null,
+          ownerId: assignee?.userId ?? null,
           createdById: null,
         },
         select: leadSelect,
       });
+
+      if (assignee) {
+        await tx.customerHistory.create({
+          data: {
+            customerId: customer.id,
+            type: CustomerHistoryType.LEAD_AUTO_ASSIGNED,
+            summary: `Inbound lead auto-assigned to ${assignee.label}`,
+            leadId: lead.id,
+          },
+        });
+      }
 
       await tx.customerHistory.create({
         data: {
