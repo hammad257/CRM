@@ -177,6 +177,7 @@ enum CustomerHistoryType {
   COMPANY_UPDATED
   NOTE_ADDED
   MANUAL
+  LEAD_AUTO_ASSIGNED
 }
 
 model Customer {
@@ -241,6 +242,20 @@ model CustomerHistory {
   @@index([customerId])
   @@index([createdAt])
   @@map("customer_history")
+}
+
+// =========================
+// INBOUND LEAD ASSIGNMENT (round-robin)
+// =========================
+
+model InboundAssignmentState {
+  id String @id @default("global")
+
+  cursor Int @default(0) @map("cursor")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("inbound_assignment_state")
 }
 
 // =========================
