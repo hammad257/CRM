@@ -61,7 +61,7 @@ export class DealsController {
   @ApiOperation({
     summary: 'Convert lead to deal',
     description:
-      'Creates an OPEN deal linked to the lead, sets lead status to CONVERTED, and defaults stage to the first stage of the default pipeline when omitted.',
+      'Creates an OPEN deal linked to the lead, sets lead status to NEGOTIATION (customer conversion runs when the deal is marked WON), and defaults stage to the first stage of the default pipeline when omitted.',
   })
   convertFromLead(
     @Param('leadId', ParseUUIDPipe) leadId: string,
@@ -87,8 +87,9 @@ export class DealsController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateDealDto,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.deals.update(id, body);
+    return this.deals.update(id, body, user.id);
   }
 
   @RequirePermissions('deals.deal.update')

@@ -12,6 +12,7 @@ import { UsersModule } from './users/users.module';
 import { LeadsModule } from './leads/leads.module';
 import { CustomersModule } from './customers/customers.module';
 import { SalesModule } from './sales/sales.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SalesModule } from './sales/sales.module';
     LeadsModule,
     CustomersModule,
     SalesModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [

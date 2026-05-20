@@ -3,12 +3,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { DealStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePipelineDto } from './dto/create-pipeline.dto';
 import { CreateStageDto } from './dto/create-stage.dto';
 import { UpdatePipelineDto } from './dto/update-pipeline.dto';
+import { PipelineBoardQueryDto } from './dto/pipeline-board.query';
 import { UpdateStageDto } from './dto/update-stage.dto';
+import { dealSelect, type DealPublic } from './deal.select';
 
 const pipelineDetailSelect = {
   id: true,
@@ -53,6 +55,50 @@ export class PipelinesService {
     });
     if (!row) throw new NotFoundException('Pipeline not found');
     return row;
+  }
+
+  async getBoard(
+    pipelineId: string,
+    query: PipelineBoardQueryDto,
+  ): Promise<{
+    pipeline: PipelineDetail;
+    status: DealStatus;
+    stages: Array<{
+      stage: PipelineDetail['stages'][number];
+      deals: DealPublic[];
+    }>;
+  }> {
+    const pipeline = await this.findById(pipelineId);
+    const status = query.status ?? DealStatus.OPEN;
+    const dealWhere: Prisma.DealWhereInput = {
+      status,
+      stage: { pipelineId },
+    };
+    if (query.ownerId != null) dealWhere.ownerId = query.ownerId;
+
+    const deals = await this.prisma.deal.findMany({
+      where: dealWhere,
+      orderBy: [{ updatedAt: 'desc' }],
+      select: dealSelect,
+    });
+
+    const byStage = new Map<string, DealPublic[]>();
+    for (const stage of pipeline.stages) {
+      byStage.set(stage.id, []);
+    }
+    for (const deal of deals) {
+      const bucket = byStage.get(deal.stageId);
+      if (bucket) bucket.push(deal);
+    }
+
+    return {
+      pipeline,
+      status,
+      stages: pipeline.stages.map((stage) => ({
+        stage,
+        deals: byStage.get(stage.id) ?? [],
+      })),
+    };
   }
 
   async create(dto: CreatePipelineDto): Promise<PipelineDetail> {

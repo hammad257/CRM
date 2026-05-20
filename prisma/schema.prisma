@@ -180,6 +180,8 @@ enum CustomerHistoryType {
   NOTE_ADDED
   MANUAL
   LEAD_AUTO_ASSIGNED
+  LEAD_CONVERTED_TO_CUSTOMER
+  DEAL_WON
 }
 
 model Customer {

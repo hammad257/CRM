@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -16,6 +17,7 @@ import {
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { CreatePipelineDto } from './dto/create-pipeline.dto';
 import { CreateStageDto } from './dto/create-stage.dto';
+import { PipelineBoardQueryDto } from './dto/pipeline-board.query';
 import { UpdatePipelineDto } from './dto/update-pipeline.dto';
 import { PipelinesService } from './pipelines.service';
 
@@ -30,6 +32,20 @@ export class PipelinesController {
   @ApiOperation({ summary: 'List pipelines and stages' })
   list() {
     return this.pipelines.list();
+  }
+
+  @RequirePermissions('pipelines.pipeline.read')
+  @Get(':id/board')
+  @ApiOperation({
+    summary: 'Pipeline board (deals grouped by stage)',
+    description:
+      'Kanban-style view for sales pipeline tracking. Defaults to OPEN deals.',
+  })
+  board(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: PipelineBoardQueryDto,
+  ) {
+    return this.pipelines.getBoard(id, query);
   }
 
   @RequirePermissions('pipelines.pipeline.read')

@@ -20,6 +20,7 @@ import {
 } from '../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { AddCustomerHistoryDto } from './dto/add-customer-history.dto';
+import { CreateCustomerDto } from './dto/create-customer.dto';
 import { ListCustomersQueryDto } from './dto/list-customers.query';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CustomersService } from './customers.service';
@@ -42,6 +43,16 @@ export class CustomersController {
   @ApiOperation({ summary: 'Export customers (JSON, max 5000)' })
   export(@Query() query: ListCustomersQueryDto) {
     return this.customers.export(query);
+  }
+
+  @RequirePermissions('customers.customer.create')
+  @Post()
+  @ApiOperation({ summary: 'Create customer profile (staff)' })
+  create(
+    @Body() body: CreateCustomerDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.customers.create(body, user.id);
   }
 
   @RequirePermissions('customers.customer.read')

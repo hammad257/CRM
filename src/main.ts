@@ -23,6 +23,7 @@ async function bootstrap() {
     .addTag('App')
     .addTag('Authentication')
     .addTag('Users')
+    .addTag('Settings — Team')
     .addTag('Identity & access — Roles')
     .addTag('Identity & access — Permissions')
     .addTag('Leads')

@@ -8,6 +8,7 @@ import { buildPaginationMeta } from '../common/pagination/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { leadSelect, type LeadPublic } from '../leads/lead.select';
 import { AddCustomerHistoryDto } from './dto/add-customer-history.dto';
+import { CreateCustomerDto } from './dto/create-customer.dto';
 import { ListCustomersQueryDto } from './dto/list-customers.query';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { WebsiteInquiryDto } from './dto/website-inquiry.dto';
@@ -159,6 +160,54 @@ export class CustomersService {
 
       return { customerId: customer.id, leadId: lead.id, lead };
     });
+  }
+
+  async create(
+    dto: CreateCustomerDto,
+    actorId: string,
+  ): Promise<unknown> {
+    const email = dto.primaryEmail.trim().toLowerCase();
+    const clash = await this.prisma.customer.findUnique({
+      where: { primaryEmail: email },
+      select: { id: true },
+    });
+    if (clash) {
+      throw new BadRequestException('primaryEmail already in use');
+    }
+
+    const customer = await this.prisma.customer.create({
+      data: {
+        status: dto.status,
+        firstName: dto.firstName.trim(),
+        lastName: dto.lastName.trim(),
+        displayName: dto.displayName?.trim() ?? null,
+        primaryEmail: email,
+        phone: dto.phone?.trim() ?? null,
+        secondaryEmail: dto.secondaryEmail?.trim().toLowerCase() ?? null,
+        addressLine: dto.addressLine?.trim() ?? null,
+        city: dto.city?.trim() ?? null,
+        region: dto.region?.trim() ?? null,
+        postalCode: dto.postalCode?.trim() ?? null,
+        country: dto.country?.trim() ?? null,
+        companyName: dto.companyName?.trim() ?? null,
+        industry: dto.industry?.trim() ?? null,
+        website: dto.website?.trim() ?? null,
+        companySize: dto.companySize?.trim() ?? null,
+        jobTitle: dto.jobTitle?.trim() ?? null,
+        profileNotes: dto.profileNotes ?? null,
+      },
+    });
+
+    await this.prisma.customerHistory.create({
+      data: {
+        customerId: customer.id,
+        type: CustomerHistoryType.PROFILE_CREATED,
+        summary: 'Customer profile created by staff',
+        createdById: actorId,
+      },
+    });
+
+    return this.findByIdWithRelations(customer.id);
   }
 
   private buildCustomerWhere(

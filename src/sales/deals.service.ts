@@ -16,6 +16,7 @@ import { CreateDealDto } from './dto/create-deal.dto';
 import { ForecastDealsQueryDto } from './dto/forecast-deals.query';
 import { ListDealsQueryDto } from './dto/list-deals.query';
 import { UpdateDealDto } from './dto/update-deal.dto';
+import { LeadCustomerConversionService } from './lead-customer-conversion.service';
 
 export type { DealPublic };
 
@@ -51,7 +52,10 @@ export interface DealForecastResult {
 
 @Injectable()
 export class DealsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly leadConversion: LeadCustomerConversionService,
+  ) {}
 
   private buildListWhere(query: ListDealsQueryDto): Prisma.DealWhereInput {
     const where: Prisma.DealWhereInput = {};
@@ -306,14 +310,23 @@ export class DealsService {
       });
       await tx.lead.update({
         where: { id: leadId },
-        data: { status: LeadStatus.CONVERTED },
+        data: { status: LeadStatus.NEGOTIATION },
       });
       return deal;
     });
   }
 
-  async update(id: string, dto: UpdateDealDto): Promise<DealPublic> {
-    await this.ensureDealExists(id);
+  async update(
+    id: string,
+    dto: UpdateDealDto,
+    actorId?: string,
+  ): Promise<DealPublic> {
+    const existing = await this.prisma.deal.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    if (!existing) throw new NotFoundException('Deal not found');
+
     if (dto.stageId) await this.ensureStageExists(dto.stageId);
     if (dto.ownerId) await this.ensureActiveUser(dto.ownerId);
     if (dto.customerId) await this.ensureCustomerExists(dto.customerId);
@@ -324,27 +337,44 @@ export class DealsService {
       dto.actualCloseDate ??
       (closing ? new Date() : undefined);
 
-    return this.prisma.deal.update({
-      where: { id },
-      data: {
-        title: dto.title,
-        amount:
-          dto.amount !== undefined
-            ? new Prisma.Decimal(dto.amount)
-            : undefined,
-        currency:
-          dto.currency !== undefined
-            ? dto.currency.toUpperCase().slice(0, 3)
-            : undefined,
-        status: dto.status,
-        stageId: dto.stageId,
-        ownerId: dto.ownerId,
-        customerId: dto.customerId,
-        expectedCloseDate: dto.expectedCloseDate,
-        actualCloseDate,
-        description: dto.description,
-      },
-      select: dealSelect,
+    const finalizeWon = this.leadConversion.shouldFinalizeWon(
+      existing.status,
+      dto.status,
+    );
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.deal.update({
+        where: { id },
+        data: {
+          title: dto.title,
+          amount:
+            dto.amount !== undefined
+              ? new Prisma.Decimal(dto.amount)
+              : undefined,
+          currency:
+            dto.currency !== undefined
+              ? dto.currency.toUpperCase().slice(0, 3)
+              : undefined,
+          status: dto.status,
+          stageId: dto.stageId,
+          ownerId: dto.ownerId,
+          customerId: dto.customerId,
+          expectedCloseDate: dto.expectedCloseDate,
+          actualCloseDate,
+          description: dto.description,
+        },
+      });
+
+      if (finalizeWon) {
+        await this.leadConversion.finalizeWonDeal(tx, id, actorId);
+      }
+
+      const deal = await tx.deal.findUnique({
+        where: { id },
+        select: dealSelect,
+      });
+      if (!deal) throw new NotFoundException('Deal not found');
+      return deal;
     });
   }
 
