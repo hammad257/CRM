@@ -28,8 +28,30 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     info: unknown,
   ): TUser {
     if (err || !user) {
-      throw err ?? new UnauthorizedException(info ?? 'Unauthorized');
+      if (err) {
+        if (err instanceof UnauthorizedException) throw err;
+        const msg =
+          err instanceof Error && err.message.trim()
+            ? err.message
+            : 'Authentication required';
+        throw new UnauthorizedException(msg);
+      }
+      const message = JwtAuthGuard.describeAuthFailure(info);
+      throw new UnauthorizedException(message);
     }
     return user;
+  }
+
+  /** Passport may pass `info` as a string, `{ message }`, or `{}` — avoid empty JSON bodies. */
+  private static describeAuthFailure(info: unknown): string {
+    if (info == null || info === false) return 'Authentication required';
+    if (typeof info === 'string') {
+      return info.trim() || 'Authentication required';
+    }
+    if (typeof info === 'object' && info !== null && 'message' in info) {
+      const m = (info as { message?: unknown }).message;
+      if (typeof m === 'string' && m.trim()) return m;
+    }
+    return 'Authentication required';
   }
 }

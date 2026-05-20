@@ -37,6 +37,8 @@ model User {
   createdLeads   Lead[] @relation("LeadCreatedBy")
   linkedCustomerProfile Customer? @relation("UserCustomerLink")
   customerHistoryAuthored CustomerHistory[] @relation("CustomerHistoryAuthor")
+  ownedDeals     Deal[] @relation("DealOwner")
+  createdDeals   Deal[] @relation("DealCreatedBy")
 
   @@index([email])
   @@map("users")
@@ -211,6 +213,7 @@ model Customer {
   linkedUser   User?   @relation("UserCustomerLink", fields: [linkedUserId], references: [id], onDelete: SetNull)
 
   leads   Lead[]
+  deals   Deal[]
   history CustomerHistory[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -317,6 +320,7 @@ model Lead {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   customerHistoryEntries CustomerHistory[]
+  deal Deal?
 
   @@index([email])
   @@index([companyName])
@@ -326,4 +330,92 @@ model Lead {
   @@index([createdAt])
   @@index([customerId])
   @@map("leads")
+}
+
+// =========================
+// SALES — PIPELINES & DEALS
+// =========================
+
+enum DealStatus {
+  OPEN
+  WON
+  LOST
+  ABANDONED
+}
+
+model Pipeline {
+  id String @id @default(uuid())
+
+  name        String
+  description String?
+  isDefault   Boolean @default(false) @map("is_default")
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  stages PipelineStage[]
+
+  @@map("pipelines")
+}
+
+model PipelineStage {
+  id String @id @default(uuid())
+
+  pipelineId String   @map("pipeline_id")
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  name            String
+  sortOrder       Int    @default(0) @map("sort_order")
+  /// 0–100; used for weighted revenue forecast on OPEN deals in this stage
+  winProbability  Int    @default(10) @map("win_probability")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  deals Deal[]
+
+  @@index([pipelineId])
+  @@map("pipeline_stages")
+}
+
+model Deal {
+  id String @id @default(uuid())
+
+  title String
+  /// Opportunity value (major currency units)
+  amount   Decimal? @db.Decimal(14, 2)
+  currency String   @default("USD") @db.VarChar(3)
+
+  status DealStatus @default(OPEN)
+
+  stageId String        @map("stage_id")
+  stage   PipelineStage @relation(fields: [stageId], references: [id], onDelete: Restrict)
+
+  ownerId String? @map("owner_id")
+  owner   User?   @relation("DealOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  customerId String?   @map("customer_id")
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  leadId String? @unique @map("lead_id")
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  expectedCloseDate DateTime? @map("expected_close_date")
+  actualCloseDate   DateTime? @map("actual_close_date")
+
+  description String? @db.Text
+
+  createdById String? @map("created_by_id")
+  createdBy   User?   @relation("DealCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([stageId])
+  @@index([ownerId])
+  @@index([customerId])
+  @@index([status])
+  @@index([expectedCloseDate])
+  @@map("deals")
 }

@@ -27,6 +27,9 @@ async function bootstrap() {
     .addTag('Identity & access — Permissions')
     .addTag('Leads')
     .addTag('Customers')
+    .addTag('Sales — Pipelines')
+    .addTag('Sales — Pipeline stages')
+    .addTag('Sales — Deals')
     .addTag('Public — Customer inquiries')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
