@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY, PERMISSIONS_KEY } from '../constants';
@@ -30,7 +31,9 @@ export class PermissionsGuard implements CanActivate {
 
     const req = context.switchToHttp().getRequest<{ user?: { id: string } }>();
     const userId = req.user?.id;
-    if (!userId) return false;
+    if (!userId) {
+      throw new UnauthorizedException('Authentication required');
+    }
 
     const { permissionCodes, roleCodes } =
       await this.access.getEffectiveAccess(userId);

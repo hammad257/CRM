@@ -442,6 +442,33 @@ async function seedRootAdmin(): Promise<void> {
   );
 }
 
+async function seedDefaultSalesPipeline(): Promise<void> {
+  console.log('• Ensuring default sales pipeline…');
+  const count = await prisma.pipeline.count();
+  if (count > 0) {
+    console.log('  ↳ pipeline(s) already exist, skipping default');
+    return;
+  }
+  await prisma.pipeline.create({
+    data: {
+      name: 'Default Sales',
+      description: 'Standard opportunity stages for lead-to-close tracking',
+      isDefault: true,
+      sortOrder: 0,
+      stages: {
+        create: [
+          { name: 'Qualification', sortOrder: 0, winProbability: 10 },
+          { name: 'Discovery', sortOrder: 1, winProbability: 20 },
+          { name: 'Proposal', sortOrder: 2, winProbability: 40 },
+          { name: 'Negotiation', sortOrder: 3, winProbability: 65 },
+          { name: 'Verbal commit', sortOrder: 4, winProbability: 85 },
+        ],
+      },
+    },
+  });
+  console.log('  ↳ Default Sales pipeline + stages created');
+}
+
 async function main(): Promise<void> {
   await removeLegacyPermissions();
   await seedPermissions();
@@ -449,6 +476,7 @@ async function main(): Promise<void> {
   await migrateLegacyAdminRole();
   await removeObsoleteRoles();
   await seedRootAdmin();
+  await seedDefaultSalesPipeline();
   console.log('✔ Seed complete');
 }
 
